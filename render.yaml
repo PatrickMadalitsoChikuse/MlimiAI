@@ -1,0 +1,59 @@
+# Render Blueprint for the Mlimi AI chatbot — FREE TIER.
+#
+# Single Web Service: gunicorn runs the Flask backend, which also serves the
+# built React frontend from frontend/dist.
+#
+# Free-tier trade-offs:
+#   - No persistent disk: SQLite (mlimi.db) is WIPED on every redeploy /
+#     restart. Users, chat history, password changes do not survive.
+#   - Service sleeps after ~15 min idle. First request after sleep is a
+#     30-60s cold start.
+#   - 750 instance-hours/month combined across all free services.
+#
+# The seeded default admin + test farmer are recreated on every boot from
+# the env vars below, so you can always log in after a redeploy.
+#
+# To deploy:
+#   1. Push this repo to GitHub.
+#   2. In Render, click "New" -> "Blueprint" and pick this repo.
+#   3. Set the secret env vars when prompted
+#      (DEFAULT_ADMIN_EMAIL, DEFAULT_ADMIN_PASSWORD).
+#   4. First boot seeds the default admin; log in with those creds.
+
+services:
+  - type: web
+    name: mlimi-ai
+    runtime: python
+    plan: free
+    healthCheckPath: /api/health
+    buildCommand: |
+      pip install -r backend/requirements.txt
+      cd frontend && npm ci && npm run build
+    startCommand: |
+      cd backend && gunicorn -w 1 -k gthread --threads 8 --timeout 120 -b 0.0.0.0:$PORT app:app
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: NODE_VERSION
+        value: 20.11.1
+      # AI model inference — English is the default model path.
+      - key: ENGLISH_MODEL_URL
+        value: https://revenge-kelp-reword.ngrok-free.dev/chat
+      - key: ENGLISH_MODEL_NAME
+        value: english-agriculture-model
+      - key: MODEL_TIMEOUT_SECONDS
+        value: 120
+      # Auth — JWT_SECRET is generated once by Render and pinned.
+      - key: JWT_SECRET
+        generateValue: true
+      # Default admin — set both in the dashboard. Seeded on every boot since
+      # the SQLite DB is ephemeral on free tier.
+      - key: DEFAULT_ADMIN_EMAIL
+        sync: false
+      - key: DEFAULT_ADMIN_NAME
+        value: Mlimi Admin
+      - key: DEFAULT_ADMIN_PASSWORD
+        sync: false
+      # Leave SEED_DEFAULT_USER unset (defaults to 1) so the demo farmer
+      # account is always available after a redeploy.

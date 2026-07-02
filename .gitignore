@@ -1,0 +1,3 @@
+.codivus/
+backend/test_huggingface.py
+frontend/*.tsbuildinfo
